@@ -39,7 +39,6 @@ from llama_index.core.readers.base import BaseReader
 from llama_index.core.schema import Document
 
 from llama_index_readers_azure_tax_forms.extractor import TaxFormExtractor, ExtractionConfig
-from llama_index_readers_azure_tax_forms.gate import AzureDiGate
 from llama_index_readers_azure_tax_forms.models import ExtractionResult
 from llama_index_readers_azure_tax_forms import audit
 

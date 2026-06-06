@@ -1,5 +1,4 @@
 """Unit tests for field normalisation — pure functions, no mocks needed."""
-import pytest
 from llama_index_readers_azure_tax_forms.normalizer import (
     normalize_key,
     normalize_value,

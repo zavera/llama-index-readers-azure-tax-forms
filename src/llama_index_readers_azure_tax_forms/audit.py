@@ -13,7 +13,6 @@ import logging
 import logging.handlers
 import os
 from pathlib import Path
-from typing import Optional
 
 from llama_index_readers_azure_tax_forms.models import ExtractionResult
 

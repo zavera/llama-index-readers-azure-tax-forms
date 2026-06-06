@@ -3,7 +3,7 @@ Unit tests for TaxFormExtractor — Azure DI calls are fully mocked.
 No real network calls, no real PDFs required.
 """
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from azure.core.exceptions import HttpResponseError
@@ -175,7 +175,7 @@ class TestTaxFormExtractor:
         with patch.object(
             extractor, "_call_azure_sync", side_effect=_http_error(429, "Too Many Requests")
         ):
-            result = await extractor.extract("test-doc", b"%PDF-fake")
+            await extractor.extract("test-doc", b"%PDF-fake")
 
         assert extractor._gate.blocked_calls >= 1
 

@@ -19,7 +19,7 @@ import asyncio
 import logging
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from azure.ai.formrecognizer import DocumentAnalysisClient
@@ -370,7 +370,6 @@ class TaxFormExtractor:
         pdf_bytes: bytes,
     ) -> list[tuple[Optional[str], Optional[str], Optional[float]]]:
         """Synchronous Azure DI invocation — called from run_in_executor."""
-        import io
 
         poller = self._client.begin_analyze_document(
             self._config.model_id,

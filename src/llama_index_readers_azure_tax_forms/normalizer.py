@@ -15,7 +15,6 @@ This module provides:
 """
 from __future__ import annotations
 
-import re
 from typing import Optional
 
 # ---------------------------------------------------------------------------
@@ -65,8 +64,9 @@ def normalize_key(raw_key: Optional[str]) -> Optional[str]:
     key = raw_key.strip()
     if not key:
         return None
-    # Replace '>' separator
-    key = key.replace(">", "-").strip()
+    # Replace '>' separator — normalise to ' - ' and collapse any double spaces
+    import re as _re
+    key = _re.sub(r'\s*>\s*', ' - ', key).strip()
     # Apply known corrections (check both the raw and the '>' -cleaned variant)
     return _KEY_CORRECTIONS.get(key, key)
 

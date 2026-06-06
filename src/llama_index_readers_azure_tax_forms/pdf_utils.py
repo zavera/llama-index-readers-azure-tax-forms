@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,6 @@ def reduce_dpi(pdf_bytes: bytes, target_dpi: int = 300) -> bytes:
     try:
         from pypdf import PdfReader, PdfWriter
         from PIL import Image
-        import pypdf.errors
 
         reader = PdfReader(io.BytesIO(pdf_bytes))
         writer = PdfWriter()
@@ -92,7 +90,6 @@ def reduce_dpi(pdf_bytes: bytes, target_dpi: int = 300) -> bytes:
                 img.save(img_buf, format="JPEG", dpi=(target_dpi, target_dpi))
                 # Add as a new PDF page backed by the re-rendered image.
                 from pypdf import PdfWriter as _W
-                from pypdf.generic import NameObject
                 sub_writer = _W()
                 sub_writer.add_blank_page(
                     width=img.width * 72 / target_dpi,
