@@ -11,3 +11,4 @@ logs/
 .ruff_cache/
 .pytest_cache/
 *.log
+samples/f*_fake.pdf
