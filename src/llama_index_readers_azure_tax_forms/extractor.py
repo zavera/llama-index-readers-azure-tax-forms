@@ -375,7 +375,6 @@ class TaxFormExtractor:
         poller = self._client.begin_analyze_document(
             self._config.model_id,
             pdf_bytes,
-            content_type="application/pdf",
         )
         result = poller.result()
         if not result.key_value_pairs:
