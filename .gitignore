@@ -11,4 +11,5 @@ logs/
 .ruff_cache/
 .pytest_cache/
 *.log
-samples/f*_fake.pdf
+# Sample PDFs — never commit real or filled tax forms (may contain PII)
+samples/*.pdf
