@@ -1,0 +1,44 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "llama-index-readers-azure-tax-forms"
+version = "0.1.0"
+description = "LlamaIndex reader for IRS tax form extraction via Azure Document Intelligence — supports Form 1040, W-2, Schedule C/E/K-1, 1065, 1120, 1120-S"
+authors = ["Ambreen Zaver <zaver.ambreen@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "llama_index_readers_azure_tax_forms", from = "src" }]
+keywords = ["llama-index", "azure", "document-intelligence", "tax-forms", "1040", "w2", "ocr", "rag"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+llama-index-core = ">=0.10.0,<1.0.0"
+azure-ai-formrecognizer = ">=3.3.0"
+pypdf = ">=3.0.0"
+Pillow = ">=10.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0.0"
+pytest-asyncio = ">=0.23.0"
+pytest-mock = ">=3.12.0"
+mypy = ">=1.0.0"
+ruff = ">=0.1.0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
