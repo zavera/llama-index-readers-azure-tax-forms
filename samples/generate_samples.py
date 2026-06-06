@@ -1,12 +1,35 @@
 """
-Fills official IRS PDF templates with realistic fake data.
+Downloads official IRS PDF templates and fills them with realistic fake data.
 
 All names, SSNs, EINs, and dollar amounts are entirely fictional.
 
 Run:
     ../.venv/bin/python generate_samples.py
 """
+import urllib.request
+from pathlib import Path
 from pypdf import PdfReader, PdfWriter
+
+
+# IRS template URLs — publicly available blank forms
+IRS_TEMPLATES = {
+    "f1040.pdf":    "https://www.irs.gov/pub/irs-pdf/f1040.pdf",
+    "fw2.pdf":      "https://www.irs.gov/pub/irs-pdf/fw2.pdf",
+    "f1040sc.pdf":  "https://www.irs.gov/pub/irs-pdf/f1040sc.pdf",
+    "f1040se.pdf":  "https://www.irs.gov/pub/irs-pdf/f1040se.pdf",
+    "f1065sk1.pdf": "https://www.irs.gov/pub/irs-pdf/f1065sk1.pdf",
+}
+
+
+def download_templates():
+    """Download IRS blank templates if not already present."""
+    for filename, url in IRS_TEMPLATES.items():
+        path = Path(filename)
+        if not path.exists():
+            print(f"  ⬇️   Downloading {filename}...")
+            urllib.request.urlretrieve(url, path)
+        else:
+            print(f"  ✓   {filename} already present")
 
 
 def fill(template: str, output: str, fields: dict):
@@ -179,7 +202,9 @@ def generate_schedule_e():
 
 
 if __name__ == "__main__":
-    print("Filling IRS templates with fake data...\n")
+    print("Downloading IRS templates...\n")
+    download_templates()
+    print("\nFilling IRS templates with fake data...\n")
     generate_1040()
     generate_w2()
     generate_schedule_c()

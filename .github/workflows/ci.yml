@@ -91,10 +91,10 @@ jobs:
           pip install -e .
 
       - name: Generate fake sample PDFs
-        # Generates filled IRS templates with fictional data — no real PII
-        run: |
-          cd samples
-          python generate_samples.py
+        # Downloads blank IRS templates from IRS.gov and fills with fictional data
+        # No real PII — all names, SSNs, and figures are entirely fictional
+        working-directory: samples
+        run: python generate_samples.py
 
       - name: Run integration test
         # Secrets are masked in logs by GitHub Actions automatically.
