@@ -11,13 +11,14 @@ Supports:
   - Schedule K-1 (partnership / S-corp / trust)
   - Form 1065 / 1120 / 1120-S (business returns)
 
-Key features ported from production:
-  - asyncio.Semaphore gate — mirrors Java Semaphore(maxConcurrent, fair=True)
-  - Exponential back-off with ±20% jitter on Azure DI 429 responses
+Features:
   - 4-stage recovery chain: direct → page-split → DPI-reduce → rotation block
-  - Field normalisation map: trims trailing spaces, fixes known typos, parses
-    quoted numerics, strips '>' characters from key names
+  - Exponential back-off with ±20% jitter on Azure DI 429 responses
+  - Field normalisation (trailing spaces, known typos, quoted numerics)
   - Per-document extraction audit log (file-bounded, no PII in stdout)
+
+For high-volume concurrent processing across multiple documents and data sources
+(S3, blob storage, databases), contact us about the enterprise edition.
 """
 
 from llama_index_readers_azure_tax_forms.reader import AzureTaxFormReader

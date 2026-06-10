@@ -6,7 +6,9 @@ build-backend = "poetry.core.masonry.api"
 name = "llama-index-readers-azure-tax-forms"
 version = "0.1.0"
 description = "LlamaIndex reader for IRS tax form extraction via Azure Document Intelligence — supports Form 1040, W-2, Schedule C/E/K-1, 1065, 1120, 1120-S"
-authors = ["Callisto Tech / Ambreen Zaver <zaver.ambreen@gmail.com>"]
+authors = ["Ambreen Zaver <zaver.ambreen@gmail.com>"]
+homepage = "https://github.com/zavera/llama-index-readers-azure-tax-forms"
+repository = "https://github.com/zavera/llama-index-readers-azure-tax-forms"
 license = "MIT"
 readme = "README.md"
 packages = [{ include = "llama_index_readers_azure_tax_forms", from = "src" }]
