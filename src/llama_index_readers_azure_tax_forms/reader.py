@@ -1,9 +1,8 @@
 """
 AzureTaxFormReader — LlamaIndex BaseReader integration.
 
-This is the primary contribution surface for the LlamaIndex ecosystem.
-It wraps the extraction engine behind the standard ``BaseReader`` interface
-so any LlamaIndex RAG pipeline can ingest IRS tax forms with a single import.
+Single-document extraction via Azure Document Intelligence.
+Multi-document concurrent processing is available in the enterprise edition.
 
 Usage::
 
@@ -12,21 +11,17 @@ Usage::
     reader = AzureTaxFormReader(
         endpoint="https://my-resource.cognitiveservices.azure.com/",
         api_key="...",
-        max_concurrent=12,
     )
 
-    # Single file
+    # From file path
     docs = reader.load_data("path/to/1040.pdf")
 
-    # Multiple files in parallel
-    docs = reader.load_data(["1040.pdf", "w2.pdf", "schedule_c.pdf"])
-
-    # From raw bytes (e.g. downloaded from S3 / blob storage)
-    docs = reader.load_data_from_bytes([("1040.pdf", pdf_bytes)])
+    # From raw bytes (S3, blob storage, form upload, etc.)
+    docs = reader.load_data_from_bytes("1040.pdf", pdf_bytes)
 
 Each returned ``Document`` contains:
-  - ``text``:     Pipe-delimited KV pairs  (``"Adjusted gross income | 75000"``)
-  - ``metadata``: ``ExtractionResult.as_dict()``
+  - ``text``:     ``"key | value"`` lines, one per extracted KV pair
+  - ``metadata``: form type, stage, timing, error info
 """
 from __future__ import annotations
 
@@ -55,26 +50,26 @@ class AzureTaxFormReader(BaseReader):
       - Form 1065, 1120, 1120-S
       - Any PDF processable by the ``prebuilt-document`` Azure DI model
 
-    The reader handles all extraction complexity internally:
-      - Concurrent extraction with a configurable semaphore gate
+    Features:
       - 4-stage recovery chain (direct → split → DPI-reduce → rotate)
       - Exponential back-off on Azure DI 429 rate limit responses
       - Field normalisation (trailing spaces, known typos, quoted numerics)
+      - Per-document audit logging (file-bounded, no PII in stdout)
+
+    For high-volume concurrent processing across multiple documents and
+    data sources (S3, blob storage, databases), see the enterprise edition.
 
     Args:
-        endpoint:           Azure Document Intelligence resource endpoint URL.
-        api_key:            Azure DI API key.
-        model_id:           Azure DI model to use (default: ``prebuilt-document``).
-        max_concurrent:     Maximum simultaneous Azure DI calls.  Tune based on
-                            your tier: S0 paid tier → 12 is a safe default.
-        pages_per_chunk:    Pages per chunk in the splitter recovery stage.
-        poll_timeout_seconds: Per-call timeout for the Azure DI poller.
-        rate_limit_max_retries:   Maximum 429 retry attempts per call.
+        endpoint:                    Azure Document Intelligence endpoint URL.
+        api_key:                     Azure DI API key.
+        model_id:                    Azure DI model (default: ``prebuilt-document``).
+        pages_per_chunk:             Pages per chunk in Stage 1 split recovery.
+        poll_timeout_seconds:        Per-call Azure DI timeout.
+        rate_limit_max_retries:      Maximum 429 retry attempts.
         rate_limit_initial_delay_ms: Back-off initial delay (ms).
         rate_limit_max_delay_ms:     Back-off ceiling (ms).
-        enable_audit_log:   Write per-document extraction audit rows to
-                            ``logs/extraction-audit.log`` (default: True).
-        audit_log_dir:      Directory for the audit log file.
+        enable_audit_log:            Write extraction audit to file (default: True).
+        audit_log_dir:               Directory for the audit log file.
     """
 
     def __init__(
@@ -82,7 +77,6 @@ class AzureTaxFormReader(BaseReader):
         endpoint: str,
         api_key: str,
         model_id: str = "prebuilt-document",
-        max_concurrent: int = 12,
         pages_per_chunk: int = 10,
         poll_timeout_seconds: int = 120,
         rate_limit_max_retries: int = 5,
@@ -100,120 +94,84 @@ class AzureTaxFormReader(BaseReader):
             rate_limit_max_retries=rate_limit_max_retries,
             rate_limit_initial_delay_ms=rate_limit_initial_delay_ms,
             rate_limit_max_delay_ms=rate_limit_max_delay_ms,
-            max_concurrent=max_concurrent,
         )
         self._extractor = TaxFormExtractor(config)
-        audit.configure_audit_logger(
-            log_dir=audit_log_dir,
-            enabled=enable_audit_log,
-        )
-
-    # ------------------------------------------------------------------
-    # BaseReader interface
-    # ------------------------------------------------------------------
+        audit.configure_audit_logger(log_dir=audit_log_dir, enabled=enable_audit_log)
 
     def load_data(
         self,
-        file: Union[str, Path, list[Union[str, Path]]],
+        file: Union[str, Path],
         extra_info: dict | None = None,
     ) -> list[Document]:
         """
-        Load and extract KV pairs from one or more PDF files.
+        Load and extract KV pairs from a single PDF file.
 
         Args:
-            file:       A single file path or a list of file paths.
-            extra_info: Optional metadata merged into every returned Document.
+            file:       Path to the PDF file.
+            extra_info: Optional metadata merged into the returned Document.
 
         Returns:
-            List of :class:`llama_index.core.schema.Document`, one per input file.
+            List containing one :class:`llama_index.core.schema.Document`.
         """
-        paths: list[Path] = (
-            [Path(f) for f in file]
-            if isinstance(file, list)
-            else [Path(file)]
-        )
-
-        pairs: list[tuple[str, bytes]] = []
-        for path in paths:
-            try:
-                pairs.append((str(path), path.read_bytes()))
-            except OSError as exc:
-                logger.error("Could not read file %s: %s", path, exc)
-                pairs.append((str(path), b""))
-
-        return self._run_extraction(pairs, extra_info or {})
+        path = Path(file)
+        try:
+            pdf_bytes = path.read_bytes()
+        except OSError as exc:
+            logger.error("Could not read file %s: %s", path, exc)
+            pdf_bytes = b""
+        return self._run_extraction(str(path), pdf_bytes, extra_info or {})
 
     def load_data_from_bytes(
         self,
-        documents: list[tuple[str, bytes]],
+        document_id: str,
+        pdf_bytes: bytes,
         extra_info: dict | None = None,
     ) -> list[Document]:
         """
         Load and extract KV pairs from in-memory PDF bytes.
 
-        Useful when documents come from blob storage, S3, a database, or
-        any source that provides raw bytes rather than file paths.
+        Useful when documents come from blob storage, S3, a form upload,
+        or any source that provides raw bytes.
 
         Args:
-            documents:  List of ``(document_id, pdf_bytes)`` tuples.
-            extra_info: Optional metadata merged into every returned Document.
+            document_id: Identifier for the document (file name, UUID, S3 key, etc.).
+            pdf_bytes:   Raw PDF bytes.
+            extra_info:  Optional metadata merged into the returned Document.
 
         Returns:
-            List of :class:`llama_index.core.schema.Document`, one per input.
+            List containing one :class:`llama_index.core.schema.Document`.
         """
-        return self._run_extraction(documents, extra_info or {})
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+        return self._run_extraction(document_id, pdf_bytes, extra_info or {})
 
     def _run_extraction(
         self,
-        documents: list[tuple[str, bytes]],
+        document_id: str,
+        pdf_bytes: bytes,
         extra_info: dict,
     ) -> list[Document]:
-        """Run async extraction synchronously via a managed event loop."""
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
 
         if loop and loop.is_running():
-            # Already inside an event loop (e.g. Jupyter) — use a thread.
             import concurrent.futures
-
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(
-                    asyncio.run, self._extractor.extract_many(documents)
-                )
-                results: list[ExtractionResult] = future.result()
+                future = pool.submit(asyncio.run, self._extractor.extract(document_id, pdf_bytes))
+                result: ExtractionResult = future.result()
         else:
-            results = asyncio.run(self._extractor.extract_many(documents))
+            result = asyncio.run(self._extractor.extract(document_id, pdf_bytes))
 
         audit.write_header()
-        llama_docs: list[Document] = []
-        for result in results:
-            audit.record(result)
-            llama_docs.append(_to_document(result, extra_info))
-        return llama_docs
+        audit.record(result)
+        return [_to_document(result, extra_info)]
 
-
-# ------------------------------------------------------------------
-# Document conversion
-# ------------------------------------------------------------------
 
 def _to_document(result: ExtractionResult, extra_info: dict) -> Document:
-    """
-    Convert an :class:`ExtractionResult` to a LlamaIndex :class:`Document`.
-
-    Text format: one ``key | value`` line per KV pair, suitable for embedding
-    and retrieval.  Empty/None values are rendered as ``(blank)``.
-    """
     lines = [
         f"{entry.key} | {entry.value if entry.value else '(blank)'}"
         for entry in result.entries
     ]
     text = "\n".join(lines) if lines else "(no key-value pairs extracted)"
-
     metadata = {**result.as_dict(), **extra_info}
     return Document(text=text, metadata=metadata)
